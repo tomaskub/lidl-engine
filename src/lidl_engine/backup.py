@@ -10,7 +10,7 @@ from pathlib import Path
 from psycopg.conninfo import conninfo_to_dict
 
 from .config import Settings
-from .db import connect
+from .db import connect, lock_collection
 
 
 def pg_environment(settings: Settings) -> dict[str, str]:
@@ -31,7 +31,7 @@ def pg_environment(settings: Settings) -> dict[str, str]:
 def backup(settings: Settings, destination: Path) -> None:
     destination.mkdir(exist_ok=False, parents=True)
     with connect(settings) as conn:
-        conn.execute("SELECT pg_advisory_lock(257002)")
+        lock_collection(conn, wait=True)
         subprocess.run(
             ["pg_dump", "--format=custom", "--file", str(destination / "database.dump")],
             env=pg_environment(settings),
@@ -55,7 +55,7 @@ def restore(settings: Settings, source: Path) -> None:
         if file_hash(source / name) != checksums[name]:
             raise ValueError("Backup checksum mismatch")
     with connect(settings) as conn:
-        conn.execute("SELECT pg_advisory_lock(257002)")
+        lock_collection(conn, wait=True)
         # Stop web and collector processes before restoring. The advisory lock prevents refresh.
         subprocess.run(
             [

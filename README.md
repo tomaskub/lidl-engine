@@ -28,7 +28,7 @@ The migration service applies numbered SQL migrations before web startup. Each m
 docker compose --profile collection run --rm collector
 ```
 
-The same public command is `lidl-engine refresh`. Exit codes are 0 for complete collection, 1 for incomplete collection, and 2 when another collector or maintenance operation holds the lock. Successful pages publish independently, including successful pages with no offers. Failed rereads preserve their previous published occurrences. The UI shows selected flyer, coverage, completeness, failures, last full success and overdue collection.
+The same public command is `lidl-engine refresh`. Exit codes are 0 for complete collection, 1 for incomplete collection, and 2 when another collector or maintenance operation holds the lock. Successful pages publish independently, including successful pages with no offers. Failed rereads preserve their previous published occurrences. Previously known pages missing from metadata also keep their offers and report incomplete coverage. The UI shows selected flyer, coverage, completeness, failures, last full success and overdue collection.
 
 Every refresh downloads source images and checks their SHA-256 content revisions. Changed URL signatures alone do not invalidate cached work. Description and extraction contracts include their model, prompt, output contract and provider configuration. Extraction additionally depends on the exact saved description. Interpretation runs again from retained extraction on refresh. After changing normalization, use `lidl-engine reprocess` to reinterpret all retained published revisions without new inference. It preserves original observation times and cannot restore audit-only withdrawn occurrences.
 

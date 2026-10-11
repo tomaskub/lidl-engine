@@ -49,7 +49,8 @@ def browse(
     # Retrieve source-supported records in one consistent query.
     rows = conn.execute(
         """
-        SELECT o.id, o.conflict_key, o.facts,
+        SELECT o.id, o.conflict_key,
+               (jsonb_agg(c.facts ORDER BY c.observed_at DESC,c.id DESC)->0) AS facts,
                jsonb_agg(jsonb_build_object('revision_id',r.id,'url',p.url,'facts',c.facts,
                    'flyer_id',p.flyer_id,'number',p.number) ORDER BY p.id) AS sources,
                bool_or(p.flyer_id=s.flyer_id) AS current

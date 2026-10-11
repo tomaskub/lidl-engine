@@ -146,7 +146,6 @@ def offer_identity(facts: dict[str, Any]) -> str:
         if k
         not in {
             "description",
-            "small_print",
             "validity_text",
             "start_source",
             "end_source",

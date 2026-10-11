@@ -45,10 +45,12 @@ def score(reference: dict[str, Any], predicted: dict[str, Any]) -> dict[str, Any
             correct += sum(
                 1 for key, value in expected.items() if key in actual and actual[key] == value
             )
-            total += len(expected) + len(actual.keys() - expected.keys())
+            total += len(expected) + sum(
+                1 for key in actual.keys() - expected.keys() if actual[key] is not None
+            )
         for item in predicted["offers"]:
             if item["reference_id"] not in refs:
-                total += len(item[measure])
+                total += sum(1 for value in item[measure].values() if value is not None)
         # Entirely missed offers reduce recall. Fact accuracy scores captured offers separately.
         scores[measure] = correct / total if total else 0.0
     extras = sum(1 for item in predicted["offers"] if item["reference_id"] not in refs)

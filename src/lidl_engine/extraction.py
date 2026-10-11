@@ -1,6 +1,7 @@
 """Two independently configured OpenRouter batch stages."""
 
 import json
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
@@ -32,37 +33,57 @@ Nie sugeruj, że dane zweryfikowano. Użyj offers: [] jeśli nie ma ofert.
 Schemat: """ + json.dumps(Extraction.model_json_schema(), ensure_ascii=False)
 
 
-def contract(settings: Settings, stage: str) -> str:
+@dataclass(frozen=True)
+class StageConfiguration:
+    name: str
+    model: str
+    prompt: str
+
+
+def stage_configuration(settings: Settings, name: str) -> StageConfiguration:
+    stages = {
+        "description": StageConfiguration(
+            "description", settings.description_model, DESCRIPTION_PROMPT
+        ),
+        "extraction": StageConfiguration(
+            "extraction", settings.extraction_model, EXTRACTION_PROMPT
+        ),
+    }
+    return stages[name]
+
+
+def contract(settings: Settings, stage: StageConfiguration) -> str:
     return fingerprint(
         {
-            "model": settings.description_model
-            if stage == "description"
-            else settings.extraction_model,
-            "prompt": DESCRIPTION_PROMPT if stage == "description" else EXTRACTION_PROMPT,
+            "model": stage.model,
+            "prompt": stage.prompt,
             "provider": settings.provider,
             "max_tokens": 16000,
         }
     )
 
 
-def request_body(stage: str, input_value: str) -> dict[str, Any]:
-    if stage == "description":
+def request_body(stage: StageConfiguration, input_value: str) -> dict[str, Any]:
+    if stage.name == "description":
         content: Any = [
-            {"type": "text", "text": DESCRIPTION_PROMPT},
+            {"type": "text", "text": stage.prompt},
             {"type": "image_url", "image_url": {"url": input_value}},
         ]
     else:
-        content = EXTRACTION_PROMPT + "\nOpis strony:\n" + input_value
+        content = stage.prompt + "\nOpis strony:\n" + input_value
     body: dict[str, Any] = {"max_tokens": 16000, "messages": [{"role": "user", "content": content}]}
-    if stage == "extraction":
+    if stage.name == "extraction":
         body["response_format"] = {"type": "json_object"}
     return body
 
 
 def submit(
-    client: httpx.Client, settings: Settings, stage: str, requests: list[dict[str, Any]]
+    client: httpx.Client,
+    settings: Settings,
+    stage: StageConfiguration,
+    requests: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    model = settings.description_model if stage == "description" else settings.extraction_model
+    model = stage.model
     if not settings.openrouter_key or not model:
         raise ValueError("Configure OpenRouter key and both stage models")
     payload: dict[str, Any] = {
@@ -92,6 +113,7 @@ def poll(client: httpx.Client, settings: Settings, batch_id: str) -> dict[str, A
 
 
 def result_text(item: dict[str, Any]) -> str:
+    check_authentication(item.get("error"))
     response = item.get("response") or {}
     status = response.get("status_code")
     if status in (401, 403):
@@ -108,3 +130,14 @@ def result_text(item: dict[str, Any]) -> str:
 
 class AuthenticationFailure(RuntimeError):
     pass
+
+
+def check_authentication(error: Any) -> None:
+    if isinstance(error, dict) and str(error.get("code", "")).casefold() in {
+        "401",
+        "403",
+        "authentication_error",
+        "invalid_api_key",
+        "authentication_failed",
+    }:
+        raise AuthenticationFailure("Provider authentication failed")

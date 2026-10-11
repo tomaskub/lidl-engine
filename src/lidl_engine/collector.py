@@ -14,7 +14,7 @@ from psycopg.types.json import Jsonb
 
 from . import extraction, source
 from .config import Settings
-from .db import connect, required_row
+from .db import connect, lock_collection, required_row
 from .domain import Extraction, fingerprint, normalize
 from .extraction import AuthenticationFailure
 from .repository import Connection, cleanup, publish, select_flyer
@@ -65,9 +65,7 @@ def refresh(
     sleep: Callable[[float], None] = time.sleep,
 ) -> int:
     with connect(settings) as conn:
-        if not required_row(
-            conn.execute("SELECT pg_try_advisory_lock(257002) AS acquired").fetchone()
-        )["acquired"]:
+        if not lock_collection(conn):
             return 2
         started = now()
         # A resumed run keeps its original deadline rather than resetting an overdue target.
@@ -110,12 +108,22 @@ def refresh(
                 "UPDATE flyers SET valid_from=%s,valid_to=%s WHERE id=%s",
                 (flyer["valid_from"], flyer["valid_to"], flyer["id"]),
             )
-            conn.execute("UPDATE runs SET expected=%s WHERE id=%s", (len(flyer["pages"]), run_id))
+            known_numbers = {
+                row["number"]
+                for row in conn.execute(
+                    "SELECT number FROM pages WHERE flyer_id=%s", (flyer["id"],)
+                ).fetchall()
+            }
+            manifest_numbers = {page["number"] for page in flyer["pages"]}
+            for missing in sorted(known_numbers - manifest_numbers):
+                errors.append(f"Strona {missing}: brak w metadanych, poprzednie oferty zachowano.")
+            conn.execute(
+                "UPDATE runs SET expected=%s WHERE id=%s",
+                (len(known_numbers | manifest_numbers), run_id),
+            )
             pages = []
             for page in flyer["pages"]:
                 try:
-                    response = retry(partial(fetch_image, client, page["image_url"]), sleep)
-                    path = save_image(settings.evidence_dir, response.content)
                     page_id = required_row(
                         conn.execute(
                             """INSERT INTO pages (flyer_id,number,url) VALUES (%s,%s,%s)
@@ -124,6 +132,8 @@ def refresh(
                             (flyer["id"], page["number"], page["url"]),
                         ).fetchone()
                     )["id"]
+                    response = retry(partial(fetch_image, client, page["image_url"]), sleep)
+                    path = save_image(settings.evidence_dir, response.content)
                     revision = required_row(
                         conn.execute(
                             """INSERT INTO revisions
@@ -174,13 +184,6 @@ def refresh(
                 except Exception as exc:
                     LOG.exception("Offer interpretation/publication failed")
                     errors.append(f"Strona {page['number']}: {safe_error(exc)}")
-            # Pages absent from a successfully retrieved complete manifest are withdrawn atomically.
-            conn.execute(
-                """UPDATE occurrences SET active=false WHERE revision_id IN
-                (SELECT r.id FROM revisions r JOIN pages p ON p.id=r.page_id
-                 WHERE p.flyer_id=%s AND NOT (p.number=ANY(%s)))""",
-                (flyer["id"], [p["number"] for p in flyer["pages"]]),
-            )
             cleanup(conn, settings.evidence_dir, now())
         except Exception as exc:
             LOG.exception("Collection stopped")
@@ -211,12 +214,13 @@ def process_stage(
     sleep: Callable[[float], None],
     errors: list[str],
 ) -> dict[int, str]:
+    configuration = extraction.stage_configuration(settings, stage)
     tasks = {}
     outputs = {}
     for page in pages:
         key = fingerprint(
             [
-                extraction.contract(settings, stage),
+                extraction.contract(settings, configuration),
                 page.get("description") if stage == "extraction" else None,
             ]
         )
@@ -238,10 +242,7 @@ def process_stage(
             break
         new = [task for task in tasks.values() if not task["batch_id"]]
         if new:
-            model = (
-                settings.description_model if stage == "description" else settings.extraction_model
-            )
-            if not settings.openrouter_key or not model:
+            if not settings.openrouter_key or not configuration.model:
                 errors.append("Brak konfiguracji dostawcy przetwarzania. Zbieranie niekompletne.")
                 break
             ids = [task["id"] for task in new]
@@ -251,7 +252,7 @@ def process_stage(
                 {
                     "custom_id": f"page-{task['page']['number']}-{task['id']}",
                     "body": extraction.request_body(
-                        stage,
+                        configuration,
                         task["page"]["image_url"]
                         if stage == "description"
                         else task["page"]["description"],
@@ -260,7 +261,7 @@ def process_stage(
                 for task in new
             ]
             try:
-                batch = extraction.submit(client, settings, stage, requests)
+                batch = extraction.submit(client, settings, configuration, requests)
                 batch_id = batch["id"]
                 conn.execute("UPDATE tasks SET batch_id=%s WHERE id=ANY(%s)", (batch_id, ids))
                 for task in new:
@@ -299,6 +300,7 @@ def process_stage(
                     if batch["status"] in {"completed", "failed", "cancelled", "expired"}:
                         break
                     sleep(settings.poll_seconds)
+                extraction.check_authentication(batch.get("error"))
                 results = batch.get("results") or []
                 by_id = {}
                 for item in results:

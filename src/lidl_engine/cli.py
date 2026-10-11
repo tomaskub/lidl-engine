@@ -10,7 +10,7 @@ import httpx
 from .backup import backup, restore
 from .collector import refresh
 from .config import Settings
-from .db import connect, migrate, required_row
+from .db import connect, lock_collection, migrate
 from .repository import cleanup, reprocess
 
 
@@ -51,9 +51,7 @@ def run(
         return 0
     if args.command in {"cleanup", "reprocess"}:
         with connect(settings) as conn:
-            if not required_row(
-                conn.execute("SELECT pg_try_advisory_lock(257002) AS acquired").fetchone()
-            )["acquired"]:
+            if not lock_collection(conn):
                 return 2
             if args.command == "cleanup":
                 cleanup(conn, settings.evidence_dir, now())
@@ -62,9 +60,7 @@ def run(
         return 0
     if args.command == "attach-batch":
         with connect(settings) as conn:
-            if not required_row(
-                conn.execute("SELECT pg_try_advisory_lock(257002) AS acquired").fetchone()
-            )["acquired"]:
+            if not lock_collection(conn):
                 return 2
             conn.execute(
                 "UPDATE tasks SET batch_id=%s WHERE id=ANY(%s) AND batch_id='submission-unknown'",

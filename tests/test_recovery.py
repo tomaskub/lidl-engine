@@ -259,3 +259,69 @@ def test_reprocess_reuses_retained_extraction_without_extending_observation(sett
     assert run(["reprocess"], settings=settings, now=lambda: after) == 0
     assert len(external.submissions) == 2
     assert "Łosoś świeży" not in browser(settings, after).get("/").get_data(as_text=True)
+
+
+def test_omitted_metadata_page_preserves_support_and_reports_missing_coverage(settings, external):
+    add_page(external)
+    item = external.extractions[1]["offers"][0]
+    external.extractions[2] = {"offers": [{**item, "name": "Oferta z pominiętej strony"}]}
+    assert refresh(settings, external) == 0
+    external.metadata["flyer"]["pages"] = external.metadata["flyer"]["pages"][:1]
+    assert refresh(settings, external) == 1
+    html = browser(settings).get("/").get_data(as_text=True)
+    assert "Oferta z pominiętej strony" in html
+    assert "1 z 2 stron przetworzono" in html and "Niekompletne" in html
+    assert "poprzednie oferty zachowano" in html
+    assert len(external.submissions) == 2
+
+
+def test_successful_same_identity_reread_removes_superseded_descriptions_from_search(
+    settings, external
+):
+    external.extractions[1]["offers"][0]["description"] = "Pochodzenie: Norwegia"
+    assert refresh(settings, external) == 0
+    external.images[1] += b"new-origin"
+    external.extractions[1]["offers"][0]["description"] = "Pochodzenie: Szkocja"
+    assert refresh(settings, external) == 0
+    html = browser(settings).get("/").get_data(as_text=True)
+    assert "Szkocja" in html and "Norwegia" not in html
+    assert "Brak ofert dla" in browser(settings).get("/?q=Norwegia").get_data(as_text=True)
+    assert "Łosoś świeży" in browser(settings).get("/?q=Szkocja").get_data(as_text=True)
+
+
+def test_disagreeing_small_print_keeps_distinct_flagged_variants(settings, external):
+    original = external.extractions[1]["offers"][0]
+    external.extractions[1]["offers"] = [
+        {**original, "small_print": "Oferta dotyczy wszystkich wariantów"},
+        {**original, "small_print": "Oferta dotyczy tylko wariantu naturalnego"},
+    ]
+    assert refresh(settings, external) == 0
+    rows = BeautifulSoup(browser(settings).get("/").data, "html.parser").select("tr.offer")
+    assert len(rows) == 2
+    assert all("Rozbieżność źródeł" in row.get_text() for row in rows)
+    assert any("wszystkich wariantów" in row.get_text() for row in rows)
+    assert any("wariantu naturalnego" in row.get_text() for row in rows)
+
+
+def test_batch_authentication_error_stops_without_new_paid_batch(settings, external):
+    original = external.respond
+
+    def denied(request):
+        response = original(request)
+        if "/batches/" in request.url.path:
+            return httpx.Response(
+                200, json={"status": "failed", "error": {"code": 401}, "results": None}
+            )
+        return response
+
+    assert (
+        run(
+            ["refresh"],
+            settings=settings,
+            client=httpx.Client(transport=httpx.MockTransport(denied)),
+            now=lambda: NOW,
+        )
+        == 1
+    )
+    assert len(external.submissions) == 1
+    assert "uwierzytelnienia" in browser(settings).get("/").get_data(as_text=True)

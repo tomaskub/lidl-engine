@@ -55,3 +55,27 @@ def test_wholly_missed_offers_reduce_recall_not_captured_fact_accuracy():
         result["scores"][key] == 1 for key in ["prices", "dates", "conditions", "categories"]
     )
     assert result["missed_offers"] == ["two"]
+
+
+def test_unknown_extra_values_are_not_unsupported_assertions():
+    reference = {
+        "offers": [
+            {
+                "id": "one",
+                "prices": {"amount": "3.99"},
+                "dates": {"start": None},
+                "conditions": {"coupon": None},
+                "categories": [],
+            }
+        ]
+    }
+    predicted = {
+        "offers": [
+            {
+                **reference["offers"][0],
+                "reference_id": "one",
+                "prices": {"amount": "3.99", "regular": None},
+            }
+        ]
+    }
+    assert score(reference, predicted)["passed"]

@@ -41,3 +41,19 @@ def required_row(row: dict[str, Any] | None) -> dict[str, Any]:
     if row is None:
         raise RuntimeError("Expected database row was not returned")
     return row
+
+
+COLLECTION_LOCK = 257002
+
+
+def lock_collection(conn: psycopg.Connection[dict[str, Any]], *, wait: bool = False) -> bool:
+    if wait:
+        conn.execute("SELECT pg_advisory_lock(%s)", (COLLECTION_LOCK,))
+        return True
+    return bool(
+        required_row(
+            conn.execute(
+                "SELECT pg_try_advisory_lock(%s) AS acquired", (COLLECTION_LOCK,)
+            ).fetchone()
+        )["acquired"]
+    )

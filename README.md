@@ -103,4 +103,4 @@ GitHub Actions runs the locked dependencies, Ruff, mypy, migrations, pytest with
 
 ## Launch verification
 
-Fixture tests verify application behavior. Launch still requires the original-image quality evaluation and household-network performance measurements described in [the verification guide](docs/verification/launch.md). They are separate checks; this implementation does not report fabricated accuracy, cost or deployment measurements.
+The [local verification report](docs/verification/per-25-local.md) records executed checks and a desktop screenshot. Fixture tests verify application behavior. Launch still requires the original-image quality evaluation and household-network performance measurements described in [the verification guide](docs/verification/launch.md). They are separate checks; this implementation does not report fabricated accuracy, cost or deployment measurements.

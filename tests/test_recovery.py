@@ -325,3 +325,39 @@ def test_batch_authentication_error_stops_without_new_paid_batch(settings, exter
     )
     assert len(external.submissions) == 1
     assert "uwierzytelnienia" in browser(settings).get("/").get_data(as_text=True)
+    assert refresh(settings, external) == 0
+    assert len(external.submissions) == 3
+    assert "Łosoś świeży" in browser(settings).get("/").get_data(as_text=True)
+
+
+def test_mixed_batch_auth_failure_preserves_successful_paid_work(settings, external):
+    add_page(external)
+    original = external.respond
+
+    def mixed(request):
+        response = original(request)
+        if request.url.path.endswith("/batch-1"):
+            batch = response.json()
+            batch["results"][0] = {
+                "custom_id": batch["results"][0]["custom_id"],
+                "response": {"status_code": 401},
+            }
+            return httpx.Response(200, json=batch)
+        return response
+
+    assert (
+        run(
+            ["refresh"],
+            settings=settings,
+            client=httpx.Client(transport=httpx.MockTransport(mixed)),
+            now=lambda: NOW,
+        )
+        == 1
+    )
+    assert len(external.submissions) == 1
+    assert refresh(settings, external) == 0
+    # Only the authentication-failed description is submitted again.
+    retried = json.loads(external.submissions[1].content)["requests"]
+    assert len(retried) == 1 and retried[0]["custom_id"].startswith("page-1-")
+    assert len(external.submissions) == 3
+    assert "2 z 2 stron przetworzono" in browser(settings).get("/").get_data(as_text=True)

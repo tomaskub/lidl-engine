@@ -300,7 +300,15 @@ def process_stage(
                     if batch["status"] in {"completed", "failed", "cancelled", "expired"}:
                         break
                     sleep(settings.poll_seconds)
-                extraction.check_authentication(batch.get("error"))
+                try:
+                    extraction.check_authentication(batch.get("error"))
+                except AuthenticationFailure:
+                    conn.execute(
+                        """UPDATE tasks SET batch_id=NULL,evidence=%s
+                           WHERE batch_id=%s AND result IS NULL""",
+                        (Jsonb(batch), batch_id),
+                    )
+                    raise
                 results = batch.get("results") or []
                 by_id = {}
                 for item in results:
@@ -308,6 +316,7 @@ def process_stage(
                     if custom_id in by_id:
                         raise ValueError("Duplicate batch custom_id")
                     by_id[custom_id] = item
+                authentication_failed = False
                 for key, task in selected.items():
                     custom_id = f"page-{task['page']['number']}-{key}"
                     try:
@@ -322,7 +331,11 @@ def process_stage(
                         outputs[task["revision_id"]] = text
                         del tasks[key]
                     except AuthenticationFailure:
-                        raise
+                        conn.execute(
+                            "UPDATE tasks SET batch_id=NULL,evidence=%s WHERE id=%s",
+                            (Jsonb(item), key),
+                        )
+                        authentication_failed = True
                     except ValueError:
                         conn.execute(
                             "UPDATE tasks SET batch_id=NULL,evidence=%s WHERE id=%s",
@@ -334,6 +347,9 @@ def process_stage(
                                 f"Strona {task['page']['number']}: "
                                 f"nieudany etap {stage} po 4 próbach."
                             )
+                if authentication_failed:
+                    # Checkpoint every successful item before stopping this mixed terminal batch.
+                    raise AuthenticationFailure("Provider authentication failed")
             except AuthenticationFailure:
                 raise
             except Exception as exc:

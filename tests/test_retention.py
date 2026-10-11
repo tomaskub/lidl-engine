@@ -55,3 +55,20 @@ def test_shared_image_file_survives_until_last_dependent_offer_expires(settings,
     assert len(list(settings.evidence_dir.iterdir())) == 1
     html = create_app(settings, now=lambda: after).test_client().get("/").get_data(as_text=True)
     assert "Inny produkt" in html and "Łosoś świeży" not in html
+
+
+def test_unknown_retention_uses_household_day_at_utc_midnight_boundary(settings, external):
+    external.metadata["flyer"].update(offerStartDate=None, offerEndDate=None)
+    external.extractions[1]["offers"][0].update(valid_from=None, valid_to=None)
+    observed = NOW.replace(hour=23)
+    assert run(["refresh"], settings=settings, client=external.client(), now=lambda: observed) == 0
+    end = observed + timedelta(days=90)
+    assert run(["cleanup"], settings=settings, now=lambda: end) == 0
+    assert "Łosoś świeży" in create_app(settings, now=lambda: end).test_client().get("/").get_data(
+        as_text=True
+    )
+    after = end + timedelta(days=1)
+    assert run(["cleanup"], settings=settings, now=lambda: after) == 0
+    assert "Łosoś świeży" not in create_app(settings, now=lambda: after).test_client().get(
+        "/"
+    ).get_data(as_text=True)

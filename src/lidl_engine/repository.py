@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -34,7 +35,13 @@ def publish(conn: Connection, revision_id: int, facts: list[dict[str, Any]], now
                          VALUES (%s,%s,%s,%s,%s) ON CONFLICT (offer_id,revision_id)
                          DO UPDATE SET active=true, facts=EXCLUDED.facts,
                          observed_at=EXCLUDED.observed_at, retain_until=EXCLUDED.retain_until""",
-                (identity, revision_id, Jsonb(offer), now, retention_until(offer, now.date())),
+                (
+                    identity,
+                    revision_id,
+                    Jsonb(offer),
+                    now,
+                    retention_until(offer, now.astimezone(ZoneInfo("Europe/Warsaw")).date()),
+                ),
             )
             for category in offer["categories"]:
                 conn.execute(
@@ -129,7 +136,10 @@ def diagnostics(conn: Connection) -> dict[str, Any]:
 
 def cleanup(conn: Connection, evidence_dir: Path, now: datetime) -> None:
     with conn.transaction():
-        conn.execute("DELETE FROM occurrences WHERE retain_until < %s", (now.date(),))
+        conn.execute(
+            "DELETE FROM occurrences WHERE retain_until < %s",
+            (now.astimezone(ZoneInfo("Europe/Warsaw")).date(),),
+        )
         conn.execute(
             """DELETE FROM offers WHERE NOT EXISTS
                 (SELECT 1 FROM occurrences c WHERE c.offer_id=offers.id)"""

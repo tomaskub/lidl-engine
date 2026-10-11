@@ -1,0 +1,19 @@
+# Tech stack 
+- runtime & deployment
+    - docker 
+    - docker compose
+- web: 
+    - python
+    - Flask
+    - Gunicorn
+    - Jinja2
+    - htmx
+    - html5
+    - css
+- scraper
+    - python
+    - httpx
+    - BeautifulSoup4
+- db
+    - PostgreSQL
+    - psycopg

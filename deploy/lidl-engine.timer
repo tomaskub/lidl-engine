@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect Lidl offers each Wednesday at 06:00 Warsaw time
+
+[Timer]
+OnCalendar=Wed *-*-* 06:00:00 Europe/Warsaw
+Persistent=true
+Unit=lidl-engine.service
+
+[Install]
+WantedBy=timers.target

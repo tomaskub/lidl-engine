@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="heading"><div><p class="eyebrow">LIDL POLSKA</p><h1>Co warto kupić?</h1><p>Znajdź ofertę i sprawdź warunki przed wizytą w sklepie.</p></div></div>
+<form action="/" method="get" hx-get="/" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" hx-trigger="submit, change, input changed delay:300ms from:input[name=q]">
+  <label class="search">Szukaj produktu<input type="search" name="q" value="{{ query }}" placeholder="Nazwa, marka lub opis…"></label>
+  <label>Kategoria<select name="category"><option value="">Wszystkie kategorie</option>{% for key, label in categories.items() %}<option value="{{ key }}" {% if key==category %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Data zakupów<input type="date" name="date" value="{{ day }}" required></label>
+  <label>Sortuj<select name="sort"><option value="name" {% if sort=='name' %}selected{% endif %}>Nazwa A–Z</option><option value="category" {% if sort=='category' %}selected{% endif %}>Kategoria</option><option value="end" {% if sort=='end' %}selected{% endif %}>Koniec ważności</option></select></label>
+  <button type="submit">Pokaż oferty</button>
+</form>
+{% include 'results.html' %}
+{% endblock %}

@@ -1,0 +1,37 @@
+<section id="results" aria-live="polite">
+  <div class="diagnostics">
+    <div><span class="label">Bieżąca gazetka</span><strong>{{ status.flyer.title if status.flyer else 'Nie wybrano gazetki' }}</strong></div>
+    <div><span class="label">Zbieranie</span>{% if status.run %}<strong>{{ status.run.processed }} z {{ status.run.expected }} stron przetworzono</strong><small>{{ 'Ukończone' if status.run.status=='complete' else 'W toku' if status.run.status=='running' else 'Niekompletne' }}</small>{% else %}<strong>Nie zebrano jeszcze danych</strong>{% endif %}</div>
+    <div><span class="label">Ostatnie pełne zebranie</span><strong>{{ status.successful.finished_at|localtime if status.successful else 'Brak' }}</strong></div>
+  </div>
+  {% if overdue %}<p class="notice">Przekroczono planowany termin zakończenia zbierania.</p>{% endif %}
+  {% if status.run and status.run.errors %}<div class="notice"><strong>Zbieranie niekompletne.</strong>{% for error in status.run.errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+  <div class="table-title"><h2>Oferty na {{ day }}</h2><span>{{ offers|length }} {{ 'wiersz' if offers|length==1 else 'wiersze' if offers|length % 10 in [2,3,4] and offers|length % 100 not in [12,13,14] else 'wierszy' }}</span></div>
+  {% if offers %}
+  <div class="table-wrap"><table><thead><tr><th>Produkt / kategoria</th><th>Cena i warunki</th><th>Ważność</th><th>Źródło</th></tr></thead><tbody>
+  {% for offer in offers %}{% set f=offer.facts %}
+  <tr class="offer {% if offer.context %}context{% endif %}" data-offer-id="{{ offer.id }}" data-conflict-key="{{ offer.conflict_key }}">
+    <td><strong class="product-name">{{ f.name }}</strong><p>{{ f.brand or '' }}{% if f.size %} · {{ f.size }}{% endif %}</p>{% if f.description %}<p>{{ f.description }}</p>{% endif %}
+      <div class="tags">{% for cat in f.categories %}<span>{{ categories[cat] }}</span>{% else %}<span>Kategoria nieznana</span>{% endfor %}</div>
+      {% if offer.conflict %}<span class="warning">Rozbieżność źródeł</span>{% endif %}{% if offer.context %}<span class="warning">Kontekst rozbieżności · nie pasuje do filtrów</span>{% endif %}
+    </td>
+    <td>{% for price in f.prices %}<div class="price {{ price.kind }}">{{ price.amount|price }} {{ 'zł' if price.currency=='PLN' else price.currency }}<span> / {{ price.unit or 'jednostka nieznana' }}</span>{% if price.kind=='regular' %}<small>Cena regularna</small>{% elif price.kind=='unit' %}<small>Cena jednostkowa</small>{% endif %}</div>{% else %}<p>Cena nieznana</p>{% endfor %}
+      {% if f.promotion %}<p>{{ f.promotion }}</p>{% endif %}{% if f.discount_percent is not none %}<p>Rabat {{ f.discount_percent }}% · {{ f.discount_scope or 'zakres nieznany' }}</p>{% endif %}
+      <p>Wymagana ilość: {{ f.required_quantity or 'nieznane' }}</p>{% if f.paid_quantity or f.received_quantity %}<p>Płacisz za {{ f.paid_quantity or 'nieznane' }} · otrzymujesz {{ f.received_quantity or 'nieznane' }}</p>{% endif %}
+      <p>Lidl Plus: {{ 'wymagany' if f.lidl_plus==true else 'niewymagany według źródła' if f.lidl_plus==false else 'nieznane' }}<br>Kupon: {{ 'wymagany' if f.coupon==true else 'niewymagany według źródła' if f.coupon==false else 'nieznane' }}</p>
+      <p>Limit: {{ f.purchase_limit or 'nieznane' }}<br>Kaucja: {{ f.deposit or 'nieznane' }}</p>{% if f.small_print %}<details><summary>Drobny druk</summary>{{ f.small_print }}</details>{% endif %}
+    </td>
+    <td><p>Od {{ f.valid_from or 'nieznane' }}<br>Do {{ f.valid_to or 'nieznane' }}</p>
+      {% if not offer.in_date %}<span class="warning">Ważna {{ f.valid_from or '?' }} – {{ f.valid_to or '?' }}</span>{% endif %}
+      {% if f.inconsistent_dates %}<span class="warning">Niespójne daty</span>{% endif %}
+      {% for source in offer.sources %}{% if source.facts.start_source=='inferred' %}<small>Początek z okresu gazetki</small>{% endif %}{% if source.facts.end_source=='inferred' %}<small>Koniec z okresu gazetki</small>{% endif %}{% endfor %}
+      {% if f.start_source=='unknown' or f.end_source=='unknown' %}<span class="warning">Ważność nieznana</span>{% endif %}
+      {% if f.validity_text %}<small>{{ f.validity_text }}</small>{% endif %}
+    </td>
+    <td>{% for source in offer.sources %}<div class="source"><a class="preview-link" href="{{ url_for('evidence',revision_id=source.revision_id) }}" target="_blank">Podgląd strony {{ source.number }}</a><a class="source-link" href="{{ source.url }}" target="_blank" rel="noopener">Otwórz w Lidl ↗</a><details><summary>Szczegóły źródła</summary>{% if source.facts.description %}<p>{{ source.facts.description }}</p>{% endif %}{% if source.facts.small_print %}<p>{{ source.facts.small_print }}</p>{% endif %}{% if source.facts.validity_text %}<p>{{ source.facts.validity_text }}</p>{% endif %}</details></div>{% endfor %}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+  {% elif not status.flyer %}<div class="empty"><h3>Nie zebrano jeszcze ofert</h3><p>Dane pojawią się po pierwszym zebraniu gazetki.</p></div>
+  {% elif status.run and status.run.status!='complete' and status.run.processed==0 %}<div class="empty"><h3>Zbieranie niekompletne</h3><p>Brak dostępnych ofert. Sprawdź stan zbierania powyżej.</p></div>
+  {% else %}<div class="empty"><h3>Brak ofert dla wybranych filtrów</h3><p>Zmień nazwę produktu, kategorię lub datę zakupów.</p></div>{% endif %}
+</section>

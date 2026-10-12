@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Oferty · Lidl Engine</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='browser.js') }}" defer></script>
+</head>
+<body>
+  <header><span class="mark">LE</span><div><strong>Lidl Engine</strong><small>Zakupy zaczynają się od planu</small></div><span class="private">Domowa gazetka</span></header>
+  <main>{% block content %}{% endblock %}</main>
+  <dialog id="preview"><button id="close-preview" aria-label="Zamknij podgląd">Zamknij ×</button><div id="preview-content"></div></dialog>
+  <footer>Oferty z gazetek Lidl Polska. Dostępność w sklepie nie jest potwierdzona.</footer>
+</body>
+</html>

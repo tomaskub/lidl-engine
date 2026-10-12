@@ -1,0 +1,12 @@
+[Unit]
+Description=Lidl Engine weekly collection
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/lidl-engine
+ExecStart=/usr/bin/docker compose --profile collection run --rm collector
+# Provider batch completion can take 24h per stage; overdue is a diagnostic, not a kill deadline.
+TimeoutStartSec=infinity

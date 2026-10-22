@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Install verification dependencies
         id: dependencies
-        run: python -m pip install -r ci/requirements.txt 2>&1 | tee evidence/diagnostics/setup.log
+        run: python -m pip install --per45-intentional-setup-failure -r ci/requirements.txt 2>&1 | tee evidence/diagnostics/setup.log
       - name: Test evidence contract
         id: tests
         run: python -m pytest --junitxml=evidence/junit.xml 2>&1 | tee evidence/diagnostics/tests.log

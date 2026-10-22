@@ -1,0 +1,18 @@
+[project]
+name = "lidl-engine-ci"
+version = "0.1.0"
+description = "CI evidence baseline, independent of the Lidl Engine application"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["ci/tests"]
+junit_family = "xunit2"
+
+[tool.mypy]
+files = ["ci"]
+strict = true
+python_version = "3.12"
+
+[tool.ruff]
+target-version = "py312"
+

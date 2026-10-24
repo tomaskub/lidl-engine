@@ -1,40 +1,26 @@
 ---
 name: implement-spec
-description: "Implement the result of /to-spec and /to-tickets in code."
+description: "Implement approved spec tickets as task PRs to main."
 disable-model-invocation: true
 ---
 
-You have been provided a spec. This spec should have tickets associated with it, describing how to implement the spec.
+Read the authoritative spec, its tickets, comments, repository routes, and native
+blocking relationships. Follow `docs/agents/task-pr-handoff.md` for task delivery
+and completion. Treat the tickets as a graph, not a sequence of unchecked steps.
 
-The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
+1. Find implementation tickets whose genuine prerequisites have merged to main.
+   Spec containers and launch-only tasks are not implementation work.
+2. Implement each eligible issue using `implement`, on its own branch and
+   worktree from updated main. Independent tasks can proceed separately.
+3. Prepare one PR to main per task. Preserve local checks and author inspection;
+   the factory handles formal review after matching CI and the ready handoff.
+4. Wait for the maintainer to merge prerequisite PRs. Fetch updated main before
+   starting any newly eligible dependent task. Preserve worktrees for pending
+   review or repair.
+5. Verify combined behavior through the explicit final acceptance ticket after
+   its prerequisites merge. Keep launch-only obligations separately tracked.
+   Report task PRs and outstanding obligations without completing the parent.
 
-The goal is the entire spec implemented on a single **integration branch**, with every ticket resolved the way the issue tracker closes work.
-
-The tickets are not a list of steps. They are a **task graph** with blocking relationships between them. This means there is always a **frontier** of tickets which are ready to be grabbed.
-
-Communication to and from subagents should be sparse. Communicate primarily through **context pointers**: to the spec, tickets, research notes, and previous commits. Don't duplicate information already available via pointers.
-
-**Implementer subagents** should be run in the background where possible for maximum concurrency.
-
-## Steps
-
-1. Read the spec and tickets to understand the task graph.
-
-2. (optional) Use an **exploration subagent** to conduct any exploration required by the tickets - relevant codebase files or external documentation. Ensure the exploration subagent can save files - it should save its markdown notes in a directory outside the repo, accessible by all future subagents. This lets **implementer subagents** focus on implementation rather than exploration.
-
-3. Create the integration branch. If the issue tracker closes work through PRs, or the user asks for one, open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one), marked as closing the spec and tickets.
-
-4. Use **implementer subagents** to implement each ticket, each in its own worktree on its own branch. Each implementer subagent:
-   - confirms its worktree is based on the integration branch before starting, and resets onto it if not;
-   - calls the Skill tool with `tdd` to build the ticket;
-   - merges the integration branch tip into its own branch before reporting done
-
-5. Once an **implementer subagent** completes, merge its work to the integration branch with a **merger subagent**.
-
-6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
-
-7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. Fix all issues raised by the code review in a single **implementer subagent**.
-
-8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.
-
-9. Clean up all **implementer subagent** worktrees.
+Use an integration branch only for an explicitly approved exception declaring
+issue scope and completion target. Current automatic enrollment supports one
+implementation issue per PR; keep multi-issue exceptions on a manual route.

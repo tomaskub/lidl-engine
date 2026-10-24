@@ -1,0 +1,18 @@
+# Client-owned settings for maintainer promotion into trusted installed policy.
+# A PR copy must never govern its own automated review.
+schema_version = 1
+
+[profiles.lidl-engine]
+repository = "tomaskub/lidl-engine"
+repository_label = "lidl-engine"
+checkout = "~/workspace/lidl-engine"
+target_branch = "main"
+allowed_authors = ["tomaskub"]
+tracker_team = "PER"
+allowed_projects = ["ec740c75-09c4-42f6-b589-953227c1b366"]
+standards = ["AGENTS.md", "docs/agents/domain.md", "ci/README.md"]
+specification_sources = ["linear:issue", "linear:project-document"]
+
+[profiles.lidl-engine.ci]
+workflow = "CI evidence"
+artifact = "ci-evidence-<run_id>-<run_attempt>"

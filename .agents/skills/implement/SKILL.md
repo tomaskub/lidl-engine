@@ -1,17 +1,19 @@
 ---
 name: implement
-description: "Implement a piece of work based on a spec or set of tickets."
+description: "Implement one task issue and prepare its PR handoff."
 disable-model-invocation: true
 ---
 
-Implement the work described by the user in the spec or tickets.
+Read the task issue, comments, and authoritative specification. State its title.
+Follow `docs/agents/task-pr-handoff.md` for routing, merged prerequisites,
+branching, checks, author inspection, ready-PR metadata, and completion rules.
 
-If the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask.
+Implement the assigned task on one branch from updated main. Use TDD at agreed
+public seams where applicable. Run relevant typechecking and focused tests as
+you work, and the full applicable suite at the end. Inspect your diff and test
+source, fix defects, and report any unverified acceptance criteria.
 
-Call the Skill tool with "tdd" where possible, at pre-agreed seams.
-
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
-
-Once done, call the Skill tool with "code-review" to review the work.
-
-Commit your work to the current branch.
+Commit the task's changes. When publication is authorized, prepare the ready PR
+and factory handoff described in the guide. The factory performs independent
+formal review after CI; author inspection is the implementation handoff check.
+Leave merge authority with the maintainer and parent acceptance with its own task.

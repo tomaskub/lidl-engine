@@ -6,9 +6,9 @@ description: "Review the changes since a fixed point (commit, branch, tag, or me
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
 - **Standards**: does the code conform to this repo's documented coding standards?
-- **Spec**: does the code faithfully implement the originating issue / spec?
+- **Spec**: does the code implement the assigned task criteria and relevant specification constraints?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
+Both axes run in fresh, independent contexts as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
 
 The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
 
@@ -22,7 +22,19 @@ Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so th
 
 Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel sub-agents.
 
-### 2. Identify the spec source
+### 2. Identify the task and spec source
+
+Fetch the explicitly assigned implementation issue, relevant comments, and its
+authoritative parent issue or project document. Follow
+`docs/agents/task-pr-handoff.md`. Separate assigned task criteria and shared
+constraints from requirements assigned to other tickets. Do not block a task PR
+on later-ticket work. Keep launch-only obligations visible separately from
+merge acceptance. Missing or contradictory scope blocks automatic review.
+
+For an explicit manual review, use the source lookup below if needed. Factory
+reviewers use the controller's current revision and requirements snapshot.
+
+### Source lookup
 
 Look for the originating spec, in this order:
 
@@ -57,6 +69,26 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 ### 4. Spawn both sub-agents in parallel
 
+Give both roles the same head/base/tested-revision snapshot, CI run/attempt,
+reports, diagnostics, and test source. Wait for matching CI evidence under
+`ci/README.md`; green summaries alone do not prove assigned behavior.
+Reviewers identify supporting tests and unverified acceptance criteria.
+A missing, stale, skipped, unexecuted, or failed required check blocks readiness.
+Reviewers remain read-only and cannot publish their own authoritative verdicts
+or modify tracker state. The controller owns publication and repair coordination.
+
+Keep each blocking finding on its originating axis. Include role, code location,
+violated assigned requirement or documented rule where applicable, failure
+explanation, and supporting code or execution evidence. Correctness defects,
+unmet assigned criteria, documented-rule violations, and failed required checks
+block. Preferences and speculative improvements are advisory. Smell heuristics
+remain advisory unless separate evidence establishes an actual defect or rule
+violation. Launch-only checks remain visible and separately tracked.
+
+The implementing or repairing agent cannot approve its own work. Both current
+axis verdicts must pass for automatic readiness; an incomplete axis stays blocked.
+
+
 Issue both sub-agent calls together, in the foreground, and aggregate the reports they return.
 
 **Standards sub-agent prompt** should include:
@@ -68,8 +100,8 @@ Issue both sub-agent calls together, in the foreground, and aggregate the report
 **Spec sub-agent prompt** should include:
 
 - The diff command and commit list.
-- The path or fetched contents of the spec.
-- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
+- The task criteria, relevant parent constraints, other-ticket context, launch obligations, and authoritative source.
+- The brief: "Identify supporting tests and unverified assigned criteria. Report: (a) assigned task requirements or relevant shared constraints that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
 
